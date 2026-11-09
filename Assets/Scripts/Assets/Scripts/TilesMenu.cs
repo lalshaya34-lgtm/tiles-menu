@@ -5,207 +5,201 @@ using UnityEngine.EventSystems;
 
 public class TilesMenu : MonoBehaviour
 {
-    [Header("Wrist Settings")]
     public Transform wristAnchor;
-    public Vector3 wristPosition =
-        new Vector3(0f, 0.04f, 0.08f);
 
-    [Header("Menu Settings")]
-    public bool startVisible = true;
+    private GameObject menu;
+    private Font font;
 
-    private GameObject menuRoot;
-    private Text pageTitle;
-    private Transform content;
-    private Font menuFont;
+    private Color purple = new Color(0.65f, 0.3f, 1f);
+    private Color background = new Color(0.06f, 0.06f, 0.09f);
+    private Color buttonColor = new Color(0.17f, 0.14f, 0.23f);
+
+    private string[] tabs =
+    {
+        "HOME", "VISUALS", "SETTINGS", "ABOUT"
+    };
 
     private void Start()
     {
-        menuFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        CreateEventSystem();
-        CreateMenu();
-
-        if (wristAnchor != null)
+        if (FindObjectOfType<EventSystem>() == null)
         {
-            menuRoot.transform.SetParent(wristAnchor, false);
-            menuRoot.transform.localPosition = wristPosition;
-            menuRoot.transform.localRotation = Quaternion.identity;
+            GameObject events = new GameObject("EventSystem");
+            events.AddComponent<EventSystem>();
+            events.AddComponent<StandaloneInputModule>();
         }
 
-        menuRoot.SetActive(startVisible);
+        CreateMenu();
     }
 
     private void Update()
     {
-        // Desktop testing shortcut.
         if (Input.GetKeyDown(KeyCode.M))
-        {
-            ToggleMenu();
-        }
-    }
-
-    public void ToggleMenu()
-    {
-        if (menuRoot != null)
-            menuRoot.SetActive(!menuRoot.activeSelf);
-    }
-
-    private void CreateEventSystem()
-    {
-        if (FindObjectOfType<EventSystem>() != null)
-            return;
-
-        GameObject events = new GameObject("TilesMenuEventSystem");
-        events.AddComponent<EventSystem>();
-        events.AddComponent<StandaloneInputModule>();
+            menu.SetActive(!menu.activeSelf);
     }
 
     private void CreateMenu()
     {
-        menuRoot = new GameObject("TilesMenuCanvas");
+        menu = new GameObject("TilesMenu");
 
-        Canvas canvas = menuRoot.AddComponent<Canvas>();
+        Canvas canvas = menu.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
 
-        CanvasScaler scaler = menuRoot.AddComponent<CanvasScaler>();
-        scaler.dynamicPixelsPerUnit = 10;
+        menu.AddComponent<CanvasScaler>();
+        menu.AddComponent<GraphicRaycaster>();
 
-        menuRoot.AddComponent<GraphicRaycaster>();
+        RectTransform rect = menu.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(500, 400);
+        rect.localScale = Vector3.one * 0.001f;
 
-        RectTransform canvasRect =
-            menuRoot.GetComponent<RectTransform>();
+        if (wristAnchor != null)
+        {
+            menu.transform.SetParent(wristAnchor, false);
+            menu.transform.localPosition = new Vector3(0, 0.04f, 0.08f);
+            menu.transform.localRotation = Quaternion.identity;
+        }
 
-        canvasRect.sizeDelta = new Vector2(500, 360);
-        canvasRect.localScale = Vector3.one * 0.001f;
+        Panel("Background", menu.transform, Vector2.zero,
+            new Vector2(500, 400), background);
 
-        CreatePanel(
-            "Background",
-            menuRoot.transform,
-            new Vector2(500, 360),
-            Vector2.zero,
-            MenuConfig.Background
-        );
+        Label("TILES MENU", menu.transform,
+            new Vector2(0, 155), 30, purple);
 
-        CreateText(
-            "TILES MENU",
-            menuRoot.transform,
-            30,
-            new Vector2(0, 145),
-            new Vector2(460, 45),
-            MenuConfig.Purple
-        );
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            int index = i;
 
-        pageTitle = CreateText(
-            "HOME",
-            menuRoot.transform,
-            22,
-            new Vector2(-145, 85),
-            new Vector2(180, 35),
-            Color.white
-        );
+            MakeButton(tabs[i], menu.transform,
+                new Vector2(-180 + i * 120, 110),
+                new Vector2(110, 42),
+                () => OpenTab(index));
+        }
 
-        content = new GameObject("Content").transform;
-        content.SetParent(menuRoot.transform, false);
-
-        RectTransform contentRect =
-            content.gameObject.AddComponent<RectTransform>();
-
-        contentRect.sizeDelta = new Vector2(440, 190);
-        contentRect.anchoredPosition = new Vector2(0, -45);
-
-        MenuTabs tabs = menuRoot.AddComponent<MenuTabs>();
-        tabs.Setup(menuRoot.transform, ChangeTab);
-
-        ChangeTab(0);
+        OpenTab(0);
     }
 
-    private void ChangeTab(int tab)
+    private void OpenTab(int index)
     {
-        pageTitle.text = MenuConfig.TabNames[tab];
+        Transform old = menu.transform.Find("Content");
 
-        foreach (Transform child in content)
-            Destroy(child.gameObject);
+        if (old != null)
+            Destroy(old.gameObject);
 
-        if (tab == 0)
+        GameObject content = new GameObject("Content");
+        content.transform.SetParent(menu.transform, false);
+
+        RectTransform rect = content.AddComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(440, 220);
+        rect.anchoredPosition = new Vector2(0, -35);
+
+        Label(tabs[index], content.transform,
+            new Vector2(0, 85), 24, Color.white);
+
+        switch (index)
         {
-            AddOption("Welcome to Tiles Menu", 55);
-            AddOption("Version 1.0", 5);
-            AddOption("PCVR UI Prototype", -45);
-        }
-        else if (tab == 1)
-        {
-            AddOption("Visual Effects Demo", 55);
-            AddOption("Color Theme Demo", 5);
-            AddOption("UI Preview", -45);
-        }
-        else if (tab == 2)
-        {
-            AddOption("Menu Scale", 55);
-            AddOption("Menu Position", 5);
-            AddOption("Close Menu", -45, ToggleMenu);
-        }
-        else if (tab == 3)
-        {
-            AddOption("Tiles Menu", 55);
-            AddOption("Made with Unity C#", 5);
-            AddOption("Version 1.0", -45);
+            case 0:
+                AddOption(content.transform, "Welcome to Tiles Menu", 35);
+                AddOption(content.transform, "Version 1.0", -15);
+                AddOption(content.transform, "PCVR UI Prototype", -65);
+                break;
+
+            case 1:
+                AddOption(content.transform, "Visual Effects Preview", 35);
+                AddOption(content.transform, "Color Theme Preview", -15);
+                AddOption(content.transform, "UI Preview", -65);
+                break;
+
+            case 2:
+                AddOption(content.transform, "Menu Information", 35);
+                AddOption(content.transform, "Purple Theme", -15);
+                MakeButton("CLOSE MENU", content.transform,
+                    new Vector2(0, -65), new Vector2(390, 42),
+                    () => menu.SetActive(false));
+                break;
+
+            case 3:
+                AddOption(content.transform, "Tiles Menu", 35);
+                AddOption(content.transform, "Made with Unity C#", -15);
+                AddOption(content.transform, "Version 1.0", -65);
+                break;
         }
     }
 
-    private void AddOption(string label, float y, System.Action action = null)
+    private void AddOption(Transform parent, string label, float y)
     {
-        MenuButton.Create(
-            label,
-            content,
+        MakeButton(label, parent,
             new Vector2(0, y),
             new Vector2(390, 42),
-            MenuConfig.ButtonColor,
-            action ?? (() => Debug.Log(label + " clicked!")),
-            menuFont
-        );
+            () => Debug.Log(label + " clicked!"));
     }
 
-    private void CreatePanel(
-        string name,
+    private void MakeButton(
+        string label,
         Transform parent,
-        Vector2 size,
-        Vector2 position,
-        Color color)
-    {
-        GameObject panel = new GameObject(name);
-        panel.transform.SetParent(parent, false);
-
-        RectTransform rect = panel.AddComponent<RectTransform>();
-        rect.sizeDelta = size;
-        rect.anchoredPosition = position;
-
-        Image image = panel.AddComponent<Image>();
-        image.color = color;
-    }
-
-    private Text CreateText(
-        string value,
-        Transform parent,
-        int fontSize,
         Vector2 position,
         Vector2 size,
-        Color color)
+        UnityEngine.Events.UnityAction action)
     {
-        GameObject obj = new GameObject("Text");
+        GameObject obj = new GameObject(label);
         obj.transform.SetParent(parent, false);
 
         RectTransform rect = obj.AddComponent<RectTransform>();
         rect.sizeDelta = size;
         rect.anchoredPosition = position;
 
+        Image image = obj.AddComponent<Image>();
+        image.color = buttonColor;
+
+        Button button = obj.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(action);
+
+        ColorBlock colors = button.colors;
+        colors.highlightedColor = purple;
+        colors.pressedColor = new Color(0.4f, 0.2f, 0.7f);
+        button.colors = colors;
+
+        Label(label, obj.transform, Vector2.zero, 17, Color.white);
+    }
+
+    private void Label(
+        string value,
+        Transform parent,
+        Vector2 position,
+        int size,
+        Color color)
+    {
+        GameObject obj = new GameObject("Label");
+        obj.transform.SetParent(parent, false);
+
+        RectTransform rect = obj.AddComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(450, 40);
+        rect.anchoredPosition = position;
+
         Text text = obj.AddComponent<Text>();
+        text.font = font;
         text.text = value;
-        text.font = menuFont;
-        text.fontSize = fontSize;
+        text.fontSize = size;
         text.color = color;
         text.alignment = TextAnchor.MiddleCenter;
+    }
 
-        return text;
+    private void Panel(
+        string name,
+        Transform parent,
+        Vector2 position,
+        Vector2 size,
+        Color color)
+    {
+        GameObject obj = new GameObject(name);
+        obj.transform.SetParent(parent, false);
+
+        RectTransform rect = obj.AddComponent<RectTransform>();
+        rect.sizeDelta = size;
+        rect.anchoredPosition = position;
+
+        Image image = obj.AddComponent<Image>();
+        image.color = color;
     }
 }
-
